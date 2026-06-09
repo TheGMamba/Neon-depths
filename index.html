@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>NEON DEPTHS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,7 +34,7 @@
   #hpfill{background:linear-gradient(90deg,#ff2d6f,#ff9b3d);box-shadow:0 0 12px var(--pink);}
   .hudrow{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
   .hudrow .lbl{min-width:36px;color:var(--cyan);}
-  #stats{display:flex;justify-content:space-between;font-size:27px;margin-top:2px;color:var(--cyan);max-width:520px;}
+  #stats{display:flex;justify-content:flex-start;gap:22px;font-size:27px;margin-top:2px;color:var(--cyan);padding-right:100px;}
   #stats b{color:var(--gold);}
   #relics{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;max-width:300px;}
   #relics span{font-size:21px;color:var(--gold);text-shadow:0 0 8px var(--gold);
@@ -137,9 +140,17 @@
   .brow .bmeta{font-size:18px;color:rgba(255,255,255,.6);}
   .brow.you{border-color:var(--gold);box-shadow:0 0 18px rgba(255,224,85,.35);background:rgba(255,224,85,.07);}
   .empty{font-size:22px;color:rgba(255,255,255,.5);padding:24px;}
-  #controls button{font-family:'VT323',monospace;width:40px;height:40px;padding:0;font-size:22px;border:2px solid rgba(34,240,255,.35);
-    background:rgba(8,8,15,.5);color:var(--cyan);border-radius:8px;box-shadow:0 0 12px rgba(34,240,255,.2);letter-spacing:0;}
-  #controls button:hover{background:rgba(34,240,255,.2);box-shadow:0 0 20px rgba(34,240,255,.5);}
+  #controls button{font-family:'VT323',monospace;width:46px;height:46px;padding:0;font-size:23px;
+    border:1px solid rgba(255,255,255,.28);color:#eafffd;border-radius:13px;letter-spacing:0;
+    background:linear-gradient(160deg,rgba(70,82,120,.55),rgba(18,22,42,.6));
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    box-shadow:0 6px 16px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.4),inset 0 -3px 6px rgba(0,0,0,.3);}
+  #controls button:hover,#controls button:active{background:linear-gradient(160deg,rgba(92,106,150,.72),rgba(28,34,58,.72));
+    box-shadow:0 8px 22px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -3px 6px rgba(0,0,0,.3);}
+  #pause{background:none;backdrop-filter:none;}
+  .pausecard{background:rgba(8,10,24,.82);border:2px solid rgba(34,240,255,.55);border-radius:18px;
+    padding:36px 44px;display:flex;flex-direction:column;align-items:center;backdrop-filter:blur(3px);
+    box-shadow:0 0 44px rgba(34,240,255,.3),inset 0 0 30px rgba(34,240,255,.07);}
 </style>
 </head>
 <body>
@@ -159,15 +170,17 @@
   <div id="stick"><i></i></div>
 
   <div id="controls">
-    <button id="mutebtn" title="mute (M)">🔊</button>
-    <button id="pausebtn" title="pause (P)">⏸</button>
+    <button id="mutebtn" title="mute (M)"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></button>
+    <button id="pausebtn" title="pause (P)"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg></button>
   </div>
 
   <div id="pause" class="panel hidden">
-    <h1 style="color:var(--gold);text-shadow:0 0 22px var(--gold),4px 4px 0 var(--purple)">PAUSED</h1>
-    <div class="btnrow" style="margin-top:24px">
-      <button id="resumebtn">RESUME</button>
-      <button id="pmenubtn">QUIT TO MENU</button>
+    <div class="pausecard">
+      <h1 style="color:var(--gold);text-shadow:0 0 22px var(--gold),4px 4px 0 var(--purple)">PAUSED</h1>
+      <div class="btnrow" style="margin-top:24px">
+        <button id="resumebtn">RESUME</button>
+        <button id="pmenubtn">QUIT TO MENU</button>
+      </div>
     </div>
   </div>
 
@@ -276,23 +289,53 @@
     const g=actx.createGain(),f=actx.createBiquadFilter();f.type='lowpass';f.frequency.value=filt||1200;
     g.gain.setValueAtTime(vol||0.12,t);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
     n.connect(f);f.connect(g);g.connect(master);n.start(t);n.stop(t+dur);}
-  function sfxShoot(){tone(760,0.05,'triangle',0.045,420);}
-  function sfxHit(){if(time-_hitT<0.03)return;_hitT=time;tone(300,0.03,'square',0.04,180);}
-  function sfxKill(){if(time-_killT<0.03)return;_killT=time;noiseBurst(0.1,0.1,1600);tone(220,0.09,'sawtooth',0.05,80);}
-  function sfxBoss(){noiseBurst(0.6,0.28,900);tone(150,0.7,'sawtooth',0.2,38);tone(300,0.5,'square',0.1,60,0.05);}
-  function sfxHurt(){tone(150,0.18,'sawtooth',0.18,70);noiseBurst(0.09,0.1,500);}
-  function sfxHeart(){tone(523,0.09,'square',0.1);tone(784,0.13,'square',0.1,null,0.09);}
-  function sfxRelic(){tone(523,0.1,'triangle',0.12);tone(659,0.1,'triangle',0.12,null,0.1);tone(880,0.2,'triangle',0.12,null,0.2);}
-  function sfxClear(){tone(440,0.08,'square',0.08);tone(660,0.13,'square',0.08,null,0.08);}
-  function sfxDescend(){tone(320,0.5,'sawtooth',0.14,70);noiseBurst(0.5,0.08,400);}
-  const ARP=[220,261.63,329.63,261.63,196,261.63,329.63,392];
+  function sfxShoot(){tone(700,0.04,'sine',0.035,520);}
+  function sfxHit(){if(time-_hitT<0.03)return;_hitT=time;tone(430,0.03,'sine',0.03,300);}
+  function sfxKill(){if(time-_killT<0.03)return;_killT=time;tone(523,0.09,'sine',0.055,300);}
+  function sfxBoss(){tone(220,0.3,'sine',0.12,110);tone(440,0.22,'sine',0.07,220,0.05);}
+  function sfxHurt(){tone(220,0.12,'sine',0.1,120);}
+  function sfxHeart(){tone(660,0.08,'sine',0.08);tone(990,0.11,'sine',0.08,null,0.08);}
+  function sfxRelic(){tone(523,0.09,'sine',0.09);tone(659,0.09,'sine',0.09,null,0.08);tone(880,0.15,'sine',0.09,null,0.16);}
+  function sfxClear(){tone(523,0.08,'sine',0.07);tone(784,0.11,'sine',0.07,null,0.07);}
+  function sfxDescend(){tone(400,0.35,'sine',0.1,180);}
+  const NOTE=n=>440*Math.pow(2,(n-69)/12);
+  // A-minor progression: Am – F – C – G (root midi + triad voicing)
+  const PROG=[
+    {bass:33,arp:[57,60,64,69]},
+    {bass:29,arp:[53,57,60,65]},
+    {bass:36,arp:[60,64,67,72]},
+    {bass:31,arp:[55,59,62,67]},
+  ];
+  function synthNote(freq,dur,type,vol,attack,filt){
+    if(!actx||muted)return;const t=actx.currentTime;
+    const o=actx.createOscillator(),g=actx.createGain();o.type=type;o.frequency.value=freq;let node=o;
+    if(filt){const f=actx.createBiquadFilter();f.type='lowpass';f.frequency.value=filt;o.connect(f);node=f;}else o.connect(g);
+    if(filt)node.connect(g);
+    const a=attack||0.005;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+a);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);g.connect(master);o.start(t);o.stop(t+dur+0.03);}
+  function kick(){if(!actx||muted)return;const t=actx.currentTime;const o=actx.createOscillator(),g=actx.createGain();
+    o.type='sine';o.frequency.setValueAtTime(135,t);o.frequency.exponentialRampToValueAtTime(45,t+0.11);
+    g.gain.setValueAtTime(0.14,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.16);o.connect(g);g.connect(master);o.start(t);o.stop(t+0.18);}
+  function hat(){if(!actx||muted)return;const t=actx.currentTime,dur=0.035;const n=actx.createBufferSource();
+    const buf=actx.createBuffer(1,Math.max(1,(actx.sampleRate*dur)|0),actx.sampleRate);const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;n.buffer=buf;const f=actx.createBiquadFilter();f.type='highpass';f.frequency.value=7500;
+    const g=actx.createGain();g.gain.setValueAtTime(0.035,t);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    n.connect(f);f.connect(g);g.connect(master);n.start(t);n.stop(t+dur);}
   function musicTick(){
-    if(actx&&!muted){if(musicStep%4===0)tone(55,0.55,'sawtooth',0.05);
-      tone(ARP[musicStep%ARP.length],0.16,'triangle',0.028);}
-    musicStep++;musicTimer=setTimeout(musicTick,250);}
-  function startMusic(){if(!musicTimer)musicTick();}
+    if(actx&&!muted){
+      const SPC=8,ch=PROG[Math.floor(musicStep/SPC)%PROG.length],s=musicStep%SPC;
+      if(s===0||s===4)synthNote(NOTE(ch.bass),0.5,'sawtooth',0.06,0.006,900);          // bass
+      if(s===0)ch.arp.slice(0,3).forEach(nn=>synthNote(NOTE(nn-12),1.7,'sawtooth',0.016,0.25,1400)); // pad
+      const an=ch.arp[s%ch.arp.length]+(s>=4?12:0);synthNote(NOTE(an),0.16,'triangle',0.03);          // arp
+      if(s%4===0)kick();
+      if(s%2===1)hat();
+    }
+    musicStep++;musicTimer=setTimeout(musicTick,200);}
+  function startMusic(){}
+  const ICON_VOL_ON='<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>';
+  const ICON_VOL_OFF='<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>';
   function toggleMute(){muted=!muted;if(master)master.gain.value=muted?0:0.5;
-    const b=document.getElementById('mutebtn');if(b)b.textContent=muted?'🔇':'🔊';}
+    const b=document.getElementById('mutebtn');if(b)b.innerHTML=muted?ICON_VOL_OFF:ICON_VOL_ON;}
 
   // stars
   let stars=[];
@@ -794,10 +837,6 @@
       c.beginPath();c.moveTo(player.r+3,0);c.lineTo(-player.r*.85,player.r*.9);c.lineTo(-player.r*.35,0);c.lineTo(-player.r*.85,-player.r*.9);c.closePath();
       c.fillStyle=hg;c.fill();c.lineWidth=1.6;c.strokeStyle='#dffcff';c.stroke();
       const cp=1+Math.sin(time*8)*.18;c.fillStyle='#eafffd';c.beginPath();c.arc(player.r*.05,0,player.r*.3*cp,0,TAU);c.fill();
-      c.globalCompositeOperation='lighter';const fl=.85+Math.sin(time*16)*.15;
-      for(const oy of[-player.r*.45,player.r*.45]){const eg=c.createRadialGradient(-player.r*.7,oy,0,-player.r*.7,oy,8*fl);
-        eg.addColorStop(0,'rgba(255,251,230,.95)');eg.addColorStop(.4,'rgba(255,155,61,.8)');eg.addColorStop(1,'rgba(255,45,111,0)');
-        c.fillStyle=eg;c.beginPath();c.arc(-player.r*.7,oy,8*fl,0,TAU);c.fill();}
       c.restore();}
     c.textAlign='center';for(const d of dnums){c.globalAlpha=clamp(d.life/.7,0,1);c.fillStyle=d.color;c.font='20px VT323, monospace';c.fillText(d.val,d.x,d.y);}c.globalAlpha=1;
   }
