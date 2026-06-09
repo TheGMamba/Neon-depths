@@ -387,7 +387,8 @@
     p.invulnDur=0.65+0.1*ml('plate')+ASSIST.ifr;
     p.maxhp+=ASSIST.hp;p.speed*=ASSIST.spd;p.dmg*=ASSIST.pdmg;p.fireInt*=ASSIST.prate;
     p.hp=p.maxhp;
-    for(let i=0;i<ml('arsenal');i++){const u=UPGRADES[(Math.random()*UPGRADES.length)|0];u.apply(p);p.relics.push(u.ico);}}
+    for(let i=0;i<ml('arsenal');i++){const av=UPGRADES.filter(u=>!(u.cap&&(p.taken[u.nm]||0)>=u.cap));if(!av.length)break;
+      const u=av[(Math.random()*av.length)|0];u.apply(p);p.taken[u.nm]=(p.taken[u.nm]||0)+1;p.relics.push(u.ico);}}
 
   // ---- dungeon ----
   const DIRS={n:{x:0,y:-1,opp:'s'},s:{x:0,y:1,opp:'n'},e:{x:1,y:0,opp:'w'},w:{x:-1,y:0,opp:'e'}};
@@ -434,7 +435,7 @@
     else if(fromDir==='w')setp(W-WALL-player.r-16,H/2);
     else setp(W/2,H/2);
     if(!room.cleared){
-      if(room.type==='combat'||room.type==='elite'||room.type==='boss'){spawnRoom(room);}
+      if(room.type==='combat'||room.type==='elite'||room.type==='boss'){spawnRoom(room);player.invuln=Math.max(player.invuln||0,0.9);}
       else if(room.type==='treasure'){room.cleared=true;openReward(false,'CHOOSE A RELIC');}
     }
   }
@@ -446,7 +447,9 @@
     const rr=(a,b)=>a+R()*(b-a);
     let n=room.type==='elite'?Math.min(30,9+floor*2):Math.min(24,6+(floor*2|0));
     if(MOBILE)n=Math.max(4,Math.round(n*0.92));
-    for(let i=0;i<n;i++){let x,y,tries=0;do{x=rr(WALL+30,W-WALL-30);y=rr(WALL+30,H-WALL-30);tries++;}while(dist2(x,y,W/2,H/2)<150*150&&tries<20);
+    const SAFE=[[W/2,WALL+player.r+16],[W/2,H-WALL-player.r-16],[WALL+player.r+16,H/2],[W-WALL-player.r-16,H/2],[W/2,H/2]];
+    const tooClose=(x,y)=>SAFE.some(p=>dist2(x,y,p[0],p[1])<125*125);
+    for(let i=0;i<n;i++){let x,y,tries=0;do{x=rr(WALL+30,W-WALL-30);y=rr(WALL+30,H-WALL-30);tries++;}while(tooClose(x,y)&&tries<30);
       let t='basic';const roll=R();
       if(room.type==='elite'){t=roll<0.28?'tank':roll<0.52?'shooter':roll<0.8?'fast':'basic';}
       else{if(floor>1&&roll<0.18)t='tank';else if(roll<0.4)t='shooter';else if(roll<0.7)t='fast';}
@@ -460,14 +463,14 @@
     else if(t==='shooter')d={r:12,hp:18,speed:64,dmg:11,color:'#ff5ec4',kind:'shooter'};
     else d={r:13,hp:16,speed:80,dmg:13,color:'#ff2d6f',kind:'basic'};
     const e={x,y,r:d.r,hp:d.hp*hpM,maxhp:d.hp*hpM,speed:d.speed*spM*ASSIST.espd,dmg:d.dmg*dmgM*ASSIST.edmg,color:d.color,kind:d.kind,
-      hit:0,rot:rand(0,TAU),spin:rand(-2,2)};
+      hit:0,rot:rand(0,TAU),spin:rand(-2,2),kx:0,ky:0};
     if(d.kind==='shooter')e.shootT=rand(0.8,1.8);
     return e;
   }
   function spawnBoss(){
     const hp=240+floor*190;
     enemies.push({x:W/2,y:WALL+110,r:48,hp,maxhp:hp,speed:42*ASSIST.espd,dmg:32*ASSIST.edmg,color:'#bd5bff',kind:'boss',isBoss:true,
-      hit:0,rot:0,spin:0.6,spawnT:2.6,burstT:3.5});
+      hit:0,rot:0,spin:0.6,spawnT:2.6,burstT:3.5,kx:0,ky:0});
   }
 
   // ---- state ----
@@ -479,7 +482,7 @@
   function defaultPlayer(){return {x:W/2,y:H/2,r:14,hitr:14*ASSIST.hitr,speed:188,hp:100,maxhp:100,regen:0,
     dmg:13,fireInt:0.5,fireTimer:0,bspeed:450,blife:0.85,count:1,pierce:0,brad:4,
     invuln:0,invulnDur:0.65,fireAngle:0,muzzle:0,heading:0,trail:[],
-    orbit:0,orbitAng:0,chain:0,explosive:0,homing:0,ricochet:0,crit:0,vamp:0,relics:[]};}
+    orbit:0,orbitAng:0,chain:0,explosive:0,ricochet:0,crit:0,vamp:0,electric:0,relics:[],taken:{}};}
   function resetRun(m){mode=m||'endless';
     if(mode==='daily'){const d=new Date();daySeed=hashSeed(d.getFullYear(),d.getMonth()+1,d.getDate());
       dayLabel=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -494,18 +497,18 @@
   // ---- relics / upgrades ----
   const UPGRADES=[
     {ico:'⚔',nm:'POWER',ds:'+30% damage',apply:p=>p.dmg*=1.3},
-    {ico:'⚡',nm:'RAPID',ds:'+22% fire rate',apply:p=>p.fireInt*=0.8},
-    {ico:'✸',nm:'SPREAD',ds:'+1 projectile',apply:p=>p.count++},
+    {ico:'⏩',nm:'RAPID',ds:'+22% fire rate',apply:p=>p.fireInt*=0.8},
+    {ico:'✸',nm:'SPREAD',ds:'+1 projectile',cap:3,apply:p=>p.count++},
     {ico:'➳',nm:'PIERCE',ds:'shots pierce +1',apply:p=>p.pierce++},
     {ico:'➤',nm:'SWIFT',ds:'+16% move speed',apply:p=>p.speed*=1.16},
     {ico:'❤',nm:'VITALITY',ds:'+25 max HP & heal',apply:p=>{p.maxhp+=25;p.hp=Math.min(p.maxhp,p.hp+45);}},
     {ico:'✚',nm:'REGEN',ds:'+1.0 HP / sec',apply:p=>p.regen+=1.0},
     {ico:'»',nm:'VELOCITY',ds:'+28% shot speed/range',apply:p=>{p.bspeed*=1.28;p.blife*=1.16;}},
-    {ico:'●',nm:'CALIBER',ds:'+55% shot size & dmg',apply:p=>{p.brad*=1.55;p.dmg*=1.2;}},
+    {ico:'●',nm:'CALIBER',ds:'+55% shot size & dmg',cap:3,apply:p=>{p.brad*=1.55;p.dmg*=1.2;}},
     {ico:'◍',nm:'ORBITAL',ds:'+1 orbiting blade',apply:p=>p.orbit++},
     {ico:'↯',nm:'CHAIN',ds:'hits arc to +1 enemy',apply:p=>p.chain++},
+    {ico:'⚡',nm:'ELECTRIFY',ds:'hits shock over time',apply:p=>p.electric++},
     {ico:'✺',nm:'VOLATILE',ds:'kills explode',apply:p=>p.explosive++},
-    {ico:'⌖',nm:'HOMING',ds:'shots seek enemies',apply:p=>p.homing++},
     {ico:'⟲',nm:'RICOCHET',ds:'shots bounce +1',apply:p=>p.ricochet++},
     {ico:'✦',nm:'CRIT',ds:'+12% crit for x3 dmg',apply:p=>p.crit=Math.min(0.6,p.crit+0.12)},
     {ico:'♥',nm:'LEECH',ds:'chance to heal on kill',apply:p=>p.vamp=Math.min(0.5,p.vamp+0.12)},
@@ -514,12 +517,12 @@
   function openReward(fromBoss,title){
     rewardFromBoss=fromBoss;
     document.getElementById('rewardbanner').textContent=title||'CHOOSE A RELIC';
-    const pool=UPGRADES.slice(),pick=[];
+    const pool=UPGRADES.filter(u=>!(u.cap&&(player.taken[u.nm]||0)>=u.cap)),pick=[];
     while(pick.length<3&&pool.length)pick.push(pool.splice((Math.random()*pool.length)|0,1)[0]);
     const wrap=document.getElementById('cards');wrap.innerHTML='';
     pick.forEach(u=>{const c=document.createElement('div');c.className='card';
       c.innerHTML=`<div class="ico" style="color:var(--gold)">${u.ico}</div><div class="nm">${u.nm}</div><div class="ds">${u.ds}</div>`;
-      c.onclick=()=>{sfxRelic();u.apply(player);player.relics.push(u.ico);drawRelics();closeReward();};wrap.appendChild(c);});
+      c.onclick=()=>{sfxRelic();u.apply(player);player.taken[u.nm]=(player.taken[u.nm]||0)+1;player.relics.push(u.ico);drawRelics();closeReward();};wrap.appendChild(c);});
     ring(player.x,player.y,'#5dffa0',160,1.6);
     state='reward';document.getElementById('levelup').classList.remove('hidden');
   }
@@ -570,6 +573,7 @@
     if(e.isBoss){sfxBoss();hitStop=0.1;}else sfxKill();
     burst(e.x,e.y,e.color,e.isBoss?40:e.kind==='tank'?22:12,e.isBoss?280:220);
     if(e.kind==='tank'||e.isBoss)ring(e.x,e.y,e.color,e.isBoss?260:90,e.isBoss?0.9:1.4);
+    if(e.isBoss)shake=Math.min(18,shake+14);else if(e.kind==='tank')shake=Math.min(18,shake+5);
     if(player.vamp&&Math.random()<player.vamp)player.hp=Math.min(player.maxhp,player.hp+4);
     if(player.explosive&&!fromBlast)explode(e.x,e.y);
     if(e.isBoss){for(let h=0;h<2;h++)hearts.push({x:e.x+rand(-40,40),y:e.y+rand(-40,40),heal:16,r:8,t:0});
@@ -581,7 +585,9 @@
     if(e.hp<=0)killEnemy(e,fromBlast);}
   function explode(x,y){const rad=46+player.explosive*16,dmg=player.dmg*(0.8+player.explosive*0.2);
     ring(x,y,'#ff9b3d',rad,1.5);burst(x,y,'#ff9b3d',16,260);
-    for(const e of enemies)if(!e.dead&&dist2(x,y,e.x,e.y)<rad*rad)damageEnemy(e,dmg,false,true);}
+    for(const e of enemies)if(!e.dead&&dist2(x,y,e.x,e.y)<rad*rad){
+      const a=Math.atan2(e.y-y,e.x-x),kb=e.isBoss?0:300;e.kx+=Math.cos(a)*kb;e.ky+=Math.sin(a)*kb;
+      damageEnemy(e,dmg,false,true);}}
   function chainLightning(from,jumps){let src=from;const seen=new Set([from]);
     for(let j=0;j<jumps;j++){const t=nearestEnemy(src.x,src.y,seen,220);if(!t)break;
       bolts.push({x1:src.x,y1:src.y,x2:t.x,y2:t.y,life:0.16});
@@ -596,7 +602,10 @@
     if(keys['a']||keys['arrowleft'])mx-=1;
     if(keys['d']||keys['arrowright'])mx+=1;
     if(tVX||tVY){mx=tVX;my=tVY;}
-    const ml=Math.hypot(mx,my);if(ml>0){mx/=ml;my/=ml;if(ml<1){mx*=ml;my*=ml;}player.heading=Math.atan2(my,mx);}
+    const ml=Math.hypot(mx,my);if(ml>0){mx/=ml;my/=ml;if(ml<1){mx*=ml;my*=ml;}}
+    {let aim;const tgt=enemies.length?nearestEnemy(player.x,player.y,null,99999):null;
+      if(tgt)aim=Math.atan2(tgt.y-player.y,tgt.x-player.x);else if(ml>0)aim=Math.atan2(my,mx);
+      if(aim!==undefined){let da=aim-player.heading;while(da>Math.PI)da-=TAU;while(da<-Math.PI)da+=TAU;player.heading+=da*Math.min(1,18*dt);}}
     let nxp=player.x+mx*player.speed*dt, nyp=player.y+my*player.speed*dt;
     if(roomOpen()){if(currentRoom.doors.n&&tryDoor('n',nxp,nyp))return;if(currentRoom.doors.s&&tryDoor('s',nxp,nyp))return;
       if(currentRoom.doors.e&&tryDoor('e',nxp,nyp))return;if(currentRoom.doors.w&&tryDoor('w',nxp,nyp))return;}
@@ -622,11 +631,6 @@
         sfxShoot();player.fireTimer=player.fireInt;}}
 
     for(let i=bullets.length-1;i>=0;i--){const b=bullets[i];
-      if(player.homing){const t=nearestEnemy(b.x,b.y,b.hits,400);
-        if(t){const want=Math.atan2(t.y-b.y,t.x-b.x);let da=want-b.ang;
-          while(da>Math.PI)da-=TAU;while(da<-Math.PI)da+=TAU;
-          const turn=(2.4+player.homing*1.8)*dt;b.ang+=clamp(da,-turn,turn);
-          const sp=Math.hypot(b.vx,b.vy);b.vx=Math.cos(b.ang)*sp;b.vy=Math.sin(b.ang)*sp;}}
       b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
       let bounced=false;
       if(b.bounce>0){
@@ -641,10 +645,16 @@
     for(let i=bolts.length-1;i>=0;i--){bolts[i].life-=dt;if(bolts[i].life<=0)bolts.splice(i,1);}
 
     for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];if(e.dead)continue;
+      if(e.kx===undefined){e.kx=0;e.ky=0;}
       const ang=Math.atan2(player.y-e.y,player.x-e.x);
-      e.x=clamp(e.x+Math.cos(ang)*e.speed*dt,WALL+e.r,W-WALL-e.r);
-      e.y=clamp(e.y+Math.sin(ang)*e.speed*dt,WALL+e.r,H-WALL-e.r);
+      e.x=clamp(e.x+(Math.cos(ang)*e.speed+e.kx)*dt,WALL+e.r,W-WALL-e.r);
+      e.y=clamp(e.y+(Math.sin(ang)*e.speed+e.ky)*dt,WALL+e.r,H-WALL-e.r);
+      {const kd=Math.max(0,1-9*dt);e.kx*=kd;e.ky*=kd;}
       e.rot+=(e.spin||0)*dt;if(e.hit>0)e.hit-=dt;if(e.orbCd>0)e.orbCd-=dt;
+      if(e.elec>0){e.elec-=dt;e.eTick=(e.eTick||0)+dt;
+        if(e.eTick>=0.2){e.eTick-=0.2;damageEnemy(e,e.elecDmg*0.2,false,false);}
+        if(Math.random()<0.5)particles.push({x:e.x+rand(-e.r,e.r),y:e.y+rand(-e.r,e.r),vx:rand(-40,40),vy:rand(-40,40),life:0.18,max:0.18,color:'#bff9ff',r:rand(1,2.4)});
+        if(e.dead)continue;}
       if(e.isBoss){e.spawnT-=dt;if(e.spawnT<=0&&enemies.length<16){e.spawnT=2.6*ASSIST.bcad;
         for(let k=0;k<2;k++)enemies.push(mkEnemy(Math.random()<0.5?'shooter':'fast',clamp(e.x+rand(-50,50),WALL+30,W-WALL-30),clamp(e.y+rand(-50,50),WALL+30,H-WALL-30)));}
         e.burstT-=dt;if(e.burstT<=0){e.burstT=3.5*ASSIST.bcad;const m=Math.max(5,Math.round((10+floor*2)*ASSIST.bcount)),base=Math.atan2(player.y-e.y,player.x-e.x);
@@ -658,6 +668,8 @@
         if(dist2(e.x,e.y,b.x,b.y)<cr*cr){b.hits.add(e);sfxHit();burst(b.x,b.y,'#fffbe6',3,140);
           const crit=player.crit>0&&Math.random()<player.crit;
           damageEnemy(e,b.dmg*(crit?3:1),crit,false);
+          {const kb=e.isBoss?0:e.kind==='tank'?130:e.kind==='fast'?360:400;e.kx+=Math.cos(b.ang)*kb;e.ky+=Math.sin(b.ang)*kb;}
+          if(player.electric){e.elec=2.4;e.elecDmg=b.dmg*0.5*player.electric;}
           if(player.chain)chainLightning(e,player.chain);
           if(b.pierce<=0&&b.bounce<=0)bullets.splice(j,1);else if(b.pierce>0)b.pierce--;
           if(e.dead)break;}}
@@ -728,7 +740,7 @@
       c.rotate(-e.rot*1.6);poly(c,0,0,e.r*0.6,3,0);c.fillStyle='rgba(255,255,255,.25)';c.fill();
       const cp=1+Math.sin(time*5)*0.12;c.fillStyle='#fffbe6';c.beginPath();c.arc(0,0,e.r*0.28*cp,0,TAU);c.fill();
       c.restore();return;}
-    const flash=e.hit>0,pulse=1+Math.sin(time*5+e.rot)*0.05;
+    const flash=e.hit>0,pulse=(1+Math.sin(time*5+e.rot)*0.05)*(flash?1.22:1);
     const bg=c.createRadialGradient(e.x,e.y,0,e.x,e.y,e.r);
     bg.addColorStop(0,'#fff');bg.addColorStop(.35,flash?'#fff':e.color);bg.addColorStop(1,flash?'#fff':'rgba(0,0,0,.55)');
     c.save();c.translate(e.x,e.y);c.scale(pulse,pulse);c.rotate(e.rot);c.fillStyle=bg;c.lineWidth=2;c.strokeStyle=flash?'#fff':e.color;
