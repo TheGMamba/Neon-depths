@@ -507,9 +507,9 @@
     {ico:'●',nm:'CALIBER',ds:'+55% shot size & dmg',cap:3,apply:p=>{p.brad*=1.55;p.dmg*=1.2;}},
     {ico:'◍',nm:'ORBITAL',ds:'+1 orbiting blade',apply:p=>p.orbit++},
     {ico:'↯',nm:'CHAIN',ds:'hits arc to +1 enemy',apply:p=>p.chain++},
-    {ico:'⚡',nm:'ELECTRIFY',ds:'hits shock over time',apply:p=>p.electric++},
+    {ico:'☣',nm:'POISON',ds:'poisons enemies on hit',apply:p=>p.electric++},
     {ico:'✺',nm:'VOLATILE',ds:'kills explode',apply:p=>p.explosive++},
-    {ico:'⟲',nm:'RICOCHET',ds:'shots bounce +1',apply:p=>p.ricochet++},
+    {ico:'⟲',nm:'RICOCHET',ds:'shots bounce off walls',cap:1,apply:p=>p.ricochet++},
     {ico:'✦',nm:'CRIT',ds:'+12% crit for x3 dmg',apply:p=>p.crit=Math.min(0.6,p.crit+0.12)},
     {ico:'♥',nm:'LEECH',ds:'chance to heal on kill',apply:p=>p.vamp=Math.min(0.5,p.vamp+0.12)},
   ];
@@ -585,9 +585,7 @@
     if(e.hp<=0)killEnemy(e,fromBlast);}
   function explode(x,y){const rad=46+player.explosive*16,dmg=player.dmg*(0.8+player.explosive*0.2);
     ring(x,y,'#ff9b3d',rad,1.5);burst(x,y,'#ff9b3d',16,260);
-    for(const e of enemies)if(!e.dead&&dist2(x,y,e.x,e.y)<rad*rad){
-      const a=Math.atan2(e.y-y,e.x-x),kb=e.isBoss?0:300;e.kx+=Math.cos(a)*kb;e.ky+=Math.sin(a)*kb;
-      damageEnemy(e,dmg,false,true);}}
+    for(const e of enemies)if(!e.dead&&dist2(x,y,e.x,e.y)<rad*rad)damageEnemy(e,dmg,false,true);}
   function chainLightning(from,jumps){let src=from;const seen=new Set([from]);
     for(let j=0;j<jumps;j++){const t=nearestEnemy(src.x,src.y,seen,220);if(!t)break;
       bolts.push({x1:src.x,y1:src.y,x2:t.x,y2:t.y,life:0.16});
@@ -627,7 +625,7 @@
         const c=player.count,sp=0.18;
         for(let i=0;i<c;i++){const a=base+(i-(c-1)/2)*sp;
           bullets.push({x:player.x,y:player.y,vx:Math.cos(a)*player.bspeed,vy:Math.sin(a)*player.bspeed,ang:a,
-            life:player.blife,r:player.brad,dmg:player.dmg,pierce:player.pierce,bounce:player.ricochet,hits:new Set()});}
+            life:player.blife*(1+player.ricochet*0.5),r:player.brad,dmg:player.dmg,pierce:player.pierce,bounce:player.ricochet,hits:new Set()});}
         sfxShoot();player.fireTimer=player.fireInt;}}
 
     for(let i=bullets.length-1;i>=0;i--){const b=bullets[i];
@@ -638,22 +636,20 @@
         else if(b.x>W-WALL-b.r){b.x=W-WALL-b.r;b.vx=-Math.abs(b.vx);bounced=true;}
         if(b.y<WALL+b.r){b.y=WALL+b.r;b.vy=Math.abs(b.vy);bounced=true;}
         else if(b.y>H-WALL-b.r){b.y=H-WALL-b.r;b.vy=-Math.abs(b.vy);bounced=true;}
-        if(bounced){b.bounce--;b.ang=Math.atan2(b.vy,b.vx);b.hits=new Set();}
+        if(bounced){b.bounce--;b.ang=Math.atan2(b.vy,b.vx);b.hits=new Set();b.life=Math.max(b.life,0.6);}
       }
       if(b.life<=0||(!bounced&&(b.x<WALL-10||b.x>W-WALL+10||b.y<WALL-10||b.y>H-WALL+10)))bullets.splice(i,1);}
     // lightning bolts fade
     for(let i=bolts.length-1;i>=0;i--){bolts[i].life-=dt;if(bolts[i].life<=0)bolts.splice(i,1);}
 
     for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];if(e.dead)continue;
-      if(e.kx===undefined){e.kx=0;e.ky=0;}
       const ang=Math.atan2(player.y-e.y,player.x-e.x);
-      e.x=clamp(e.x+(Math.cos(ang)*e.speed+e.kx)*dt,WALL+e.r,W-WALL-e.r);
-      e.y=clamp(e.y+(Math.sin(ang)*e.speed+e.ky)*dt,WALL+e.r,H-WALL-e.r);
-      {const kd=Math.max(0,1-9*dt);e.kx*=kd;e.ky*=kd;}
+      e.x=clamp(e.x+Math.cos(ang)*e.speed*dt,WALL+e.r,W-WALL-e.r);
+      e.y=clamp(e.y+Math.sin(ang)*e.speed*dt,WALL+e.r,H-WALL-e.r);
       e.rot+=(e.spin||0)*dt;if(e.hit>0)e.hit-=dt;if(e.orbCd>0)e.orbCd-=dt;
       if(e.elec>0){e.elec-=dt;e.eTick=(e.eTick||0)+dt;
         if(e.eTick>=0.2){e.eTick-=0.2;damageEnemy(e,e.elecDmg*0.2,false,false);}
-        if(Math.random()<0.5)particles.push({x:e.x+rand(-e.r,e.r),y:e.y+rand(-e.r,e.r),vx:rand(-40,40),vy:rand(-40,40),life:0.18,max:0.18,color:'#bff9ff',r:rand(1,2.4)});
+        if(Math.random()<0.5)particles.push({x:e.x+rand(-e.r,e.r),y:e.y+rand(-e.r,e.r),vx:rand(-40,40),vy:rand(-40,40),life:0.18,max:0.18,color:'#9bff3d',r:rand(1,2.4)});
         if(e.dead)continue;}
       if(e.isBoss){e.spawnT-=dt;if(e.spawnT<=0&&enemies.length<16){e.spawnT=2.6*ASSIST.bcad;
         for(let k=0;k<2;k++)enemies.push(mkEnemy(Math.random()<0.5?'shooter':'fast',clamp(e.x+rand(-50,50),WALL+30,W-WALL-30),clamp(e.y+rand(-50,50),WALL+30,H-WALL-30)));}
@@ -668,7 +664,6 @@
         if(dist2(e.x,e.y,b.x,b.y)<cr*cr){b.hits.add(e);sfxHit();burst(b.x,b.y,'#fffbe6',3,140);
           const crit=player.crit>0&&Math.random()<player.crit;
           damageEnemy(e,b.dmg*(crit?3:1),crit,false);
-          {const kb=e.isBoss?0:e.kind==='tank'?130:e.kind==='fast'?360:400;e.kx+=Math.cos(b.ang)*kb;e.ky+=Math.sin(b.ang)*kb;}
           if(player.electric){e.elec=2.4;e.elecDmg=b.dmg*0.5*player.electric;}
           if(player.chain)chainLightning(e,player.chain);
           if(b.pierce<=0&&b.bounce<=0)bullets.splice(j,1);else if(b.pierce>0)b.pierce--;
